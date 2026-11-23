@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+.env
+.env.*
+*.pem
+*.key
+*.pkl
+*.pt
+*.pth
+*.ckpt
+*.zip
+*.lock
+# Python cache directories at any depth
+**/__pycache__/
+# Generated run-example outputs
+results/compare_controllers/
+results/gym_formulation_check/
+results/neighborhood_render/

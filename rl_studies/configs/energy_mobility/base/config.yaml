@@ -1,0 +1,51 @@
+# Shared energy–mobility study settings. These three reward weights apply to
+# base and to every justice study. All default to the original value 1.0.
+# The library fixes the normalization references (74 kWh, 267.939... kW²h,
+# 160 kWh) and reward timing; weights scale the resulting normalized terms.
+reward_weights:
+  unmet_departure_energy: 1.0  # Departure shortfall; charged when each household leaves.
+  grid_constraint: 1.0         # Squared import overload; charged each step.
+  total_ev_clipping: 1.0       # Requested/applied EV energy mismatch; charged each step.
+
+# Paper alignment metrics use these same declared household reference
+# preferences for every controller, including Standard PPO. The loader saves
+# the resolved preferences with each run so test does not depend on this file
+# or the recognitional config remaining at their original locations.
+paper_metric_reference_profile: declared_needs_v1
+
+# PPO choices shared by fixed and variable days. A full run uses total_timesteps.
+training:
+  seed: 0
+  total_timesteps: 3000000
+  device: auto
+  ppo:
+    learning_rate: 3.0e-05
+    n_steps: 512
+    batch_size: 64
+    n_epochs: 10
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.0
+    policy_kwargs:
+      net_arch: [128, 128]
+
+# MODE in train.py selects one section. Both modes keep 48 half-hour steps and
+# the same observation size for a selected justice formulation.
+modes:
+  fixed:
+    # Repeat the reference scenario day. Validation and test replay that day.
+    evaluation:
+      interval_steps: 10000
+      checkpoint_window_steps: 500000
+  variable:
+    # Train days are sampled with replacement. Validation and test use their
+    # own distinct generated days, each evaluated once per check. The scenario
+    # YAML's day_variation section defines which physical inputs can change.
+    evaluation:
+      interval_steps: 262144
+      checkpoint_window_steps: 500000
+    days:
+      generator_seed: 32020
+      sampling_seed: 32020
+      counts: {train: 64, validation: 16, test: 32}

@@ -1,0 +1,22 @@
+# Epistemic-motivated mobility/grid priority sweep. This uses the BASE
+# energy–mobility observation, actions, simulator and normalization. It trains
+# independent scalar PPO policies; it does not activate the library's separate
+# epistemic objective-profile/MORL formulation.
+# For priority lambda, the mobility coefficient is lambda times the sum of
+# base mobility+grid weights; the grid coefficient uses (1-lambda) times that
+# sum. The base command-mismatch weight stays fixed across priorities.
+# With the bundled base weights (1,1,1), this exactly gives 2*lambda,
+# 2*(1-lambda), and 1 as in the historical energy–mobility experiment.
+priority_weights: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+# Independent PPO seeds per priority. The number of trained policies is
+# len(priority_weights) * len(training_seeds): 11 * 3 = 33 by default.
+# Each run also retains the best validation model in every 500K-step window
+# configured in base/config.yaml: 6 candidate checkpoints per 3M-step run,
+# hence 198 candidate policies with the bundled settings.
+training_seeds: [0, 1, 2]
+
+# Common reset seed for evaluating every candidate on the validation days.
+# The reserved test uses a distinct seed; day splits remain disjoint in
+# variable mode regardless of this value.
+evaluation_seed: 20000

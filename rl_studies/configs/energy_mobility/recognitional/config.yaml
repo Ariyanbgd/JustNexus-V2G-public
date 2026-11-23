@@ -1,0 +1,28 @@
+# PREFERENCE_PROFILE in train.py selects one profile below. Each household
+# needs a priority_order: first minimize trip shortfall, then consider its
+# listed concerns in order, finally minimize squared charging power to break
+# remaining ties. These are declared experimental preferences, not survey data.
+# The library solves a day-specific offline oracle for each household. The
+# policy keeps the base 52-value observation and receives an extra per-step
+# reward for matching the simulator-applied action to those oracle actions.
+profiles:
+  declared_needs_v1:
+    # Multiplies the sum of household-normalized squared action gaps.
+    # Default 0.2 reproduces the original experiment. Zero disables this
+    # reward while still building the profile's oracle schedules.
+    action_gap_weight: 0.2
+    # Allowed middle objectives: minimum_reserve_shortfall, minimum_bill,
+    # minimum_incremental_bill, minimum_discharge, minimum_throughput.
+    # minimum_reserve_shortfall also needs a positive reserve_kwh.
+    preferences:
+      reliable_commuter:
+        reserve_kwh: 4.0
+        priority_order: [minimum_trip_shortfall, minimum_reserve_shortfall, minimum_throughput, minimum_bill, minimum_squared_power]
+      price_flexible_worker:
+        priority_order: [minimum_trip_shortfall, minimum_bill, minimum_throughput, minimum_squared_power]
+      solar_battery_conserver:
+        priority_order: [minimum_trip_shortfall, minimum_throughput, minimum_bill, minimum_squared_power]
+      low_power_affordability_home:
+        priority_order: [minimum_trip_shortfall, minimum_incremental_bill, minimum_throughput, minimum_squared_power]
+      battery_autonomy_home:
+        priority_order: [minimum_trip_shortfall, minimum_discharge, minimum_bill, minimum_throughput, minimum_squared_power]

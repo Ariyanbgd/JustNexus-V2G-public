@@ -1,0 +1,239 @@
+n_households: 5
+dt_hours: 0.5
+episode_steps: 49
+cycle_steps: 48
+households:
+- label: reliable_commuter
+  note: 'Early essential commute: connected overnight, departs at 07:30, returns at
+    18:00.'
+  ev:
+    battery_capacity_kwh: 50.0
+    max_charge_kw: 7.0
+    max_discharge_kw: 7.0
+    charge_efficiency: 0.95
+    discharge_efficiency: 0.95
+    initial_energy_kwh: 0.0
+    initial_energy_range_kwh:
+    - 0.0
+    - 0.0
+    daily_battery_throughput_limit_kwh: 5.0
+    daily_battery_reserve_fraction: 0.1
+  mobility:
+    departure_step: 15
+    disconnected_start: 15
+    disconnected_end: 35
+    required_departure_energy_kwh: 20.0
+    trip_energy_kwh: 20.0
+    always_connected: false
+  load:
+    base_kw: 0.15
+    evening_peak_kw: 1.6
+    evening_start: 34
+    evening_end: 43
+    morning_peak_kw: 2.0
+    morning_start: 13
+    morning_end: 20
+  pv:
+    peak_kw: 0.3
+    peak_step: 22
+    generation_start: 16
+    generation_end: 30
+    taper_kw_per_step: 0.05
+  procedural:
+    authority_scope: discharge_only
+    authority_mode: full
+- label: price_flexible_worker
+  note: 'Flexible work trip: departs at 09:00, returns at 16:00.'
+  ev:
+    battery_capacity_kwh: 60.0
+    max_charge_kw: 7.0
+    max_discharge_kw: 4.0
+    charge_efficiency: 0.95
+    discharge_efficiency: 0.95
+    initial_energy_kwh: 0.0
+    initial_energy_range_kwh:
+    - 0.0
+    - 0.0
+    daily_battery_throughput_limit_kwh: 6.0
+    daily_battery_reserve_fraction: 0.1
+  mobility:
+    departure_step: 18
+    disconnected_start: 18
+    disconnected_end: 31
+    required_departure_energy_kwh: 14.0
+    trip_energy_kwh: 14.0
+    always_connected: false
+  load:
+    base_kw: 0.2
+    evening_peak_kw: 1.8
+    evening_start: 34
+    evening_end: 43
+    morning_peak_kw: 1.8
+    morning_start: 13
+    morning_end: 20
+  pv:
+    peak_kw: 1.1
+    peak_step: 23
+    generation_start: 16
+    generation_end: 30
+    taper_kw_per_step: 0.1
+  procedural:
+    authority_scope: discharge_only
+    authority_mode: limited
+    authorized_start_step: 12
+    authorized_end_step: 32
+- label: solar_battery_conserver
+  note: 'Short daytime trip: departs at 10:00, returns at 15:00.'
+  ev:
+    battery_capacity_kwh: 80.0
+    max_charge_kw: 11.0
+    max_discharge_kw: 7.0
+    charge_efficiency: 0.95
+    discharge_efficiency: 0.95
+    initial_energy_kwh: 0.0
+    initial_energy_range_kwh:
+    - 0.0
+    - 0.0
+    daily_battery_throughput_limit_kwh: 8.0
+    daily_battery_reserve_fraction: 0.1
+  mobility:
+    departure_step: 20
+    disconnected_start: 20
+    disconnected_end: 29
+    required_departure_energy_kwh: 12.0
+    trip_energy_kwh: 12.0
+    always_connected: false
+  load:
+    base_kw: 0.2
+    evening_peak_kw: 1.5
+    evening_start: 34
+    evening_end: 43
+    morning_peak_kw: 1.5
+    morning_start: 13
+    morning_end: 20
+  pv:
+    peak_kw: 4.0
+    peak_step: 23
+    generation_start: 14
+    generation_end: 31
+    taper_kw_per_step: 0.22
+  procedural:
+    authority_scope: discharge_only
+    authority_mode: full
+- label: low_power_affordability_home
+  note: 'Early low-power charging need: departs at 06:30, returns at 19:00.'
+  ev:
+    battery_capacity_kwh: 40.0
+    max_charge_kw: 3.7
+    max_discharge_kw: 3.7
+    charge_efficiency: 0.92
+    discharge_efficiency: 0.92
+    initial_energy_kwh: 0.0
+    initial_energy_range_kwh:
+    - 0.0
+    - 0.0
+    daily_battery_throughput_limit_kwh: 4.0
+    daily_battery_reserve_fraction: 0.1
+  mobility:
+    departure_step: 14
+    disconnected_start: 14
+    disconnected_end: 37
+    required_departure_energy_kwh: 14.0
+    trip_energy_kwh: 14.0
+    always_connected: false
+  load:
+    base_kw: 0.3
+    evening_peak_kw: 2.8
+    evening_start: 32
+    evening_end: 44
+    morning_peak_kw: 2.8
+    morning_start: 13
+    morning_end: 20
+  pv:
+    peak_kw: 0.0
+    peak_step: 23
+    generation_start: 16
+    generation_end: 30
+    taper_kw_per_step: 0.1
+  procedural:
+    authority_scope: discharge_only
+    authority_mode: limited
+    authorized_start_step: 30
+    authorized_end_step: 44
+- label: battery_autonomy_home
+  note: 'Regular daytime trip: departs at 08:30, returns at 17:00.'
+  ev:
+    battery_capacity_kwh: 55.0
+    max_charge_kw: 7.0
+    max_discharge_kw: 7.0
+    charge_efficiency: 0.95
+    discharge_efficiency: 0.95
+    initial_energy_kwh: 0.0
+    initial_energy_range_kwh:
+    - 0.0
+    - 0.0
+    daily_battery_throughput_limit_kwh: 5.5
+    daily_battery_reserve_fraction: 0.1
+  mobility:
+    departure_step: 17
+    disconnected_start: 17
+    disconnected_end: 33
+    required_departure_energy_kwh: 14.0
+    trip_energy_kwh: 14.0
+    always_connected: false
+  load:
+    base_kw: 0.15
+    evening_peak_kw: 1.8
+    evening_start: 34
+    evening_end: 43
+    morning_peak_kw: 1.8
+    morning_start: 13
+    morning_end: 20
+  pv:
+    peak_kw: 1.6
+    peak_step: 23
+    generation_start: 16
+    generation_end: 30
+    taper_kw_per_step: 0.12
+  procedural:
+    authority_scope: discharge_only
+    authority_mode: none
+    fallback_controller: idle
+system:
+  max_import_kw: 9.0
+  max_export_kw: 5.0
+  export_tariff_mode: dynamic_import_discount
+  export_tariff_discount_eur_per_kwh: 0.1
+  import_tariff_default_eur_per_kwh: 0.15
+  import_tariff_periods:
+  - start_step: 13
+    end_step: 20
+    eur_per_kwh: 0.35
+  - start_step: 21
+    end_step: 30
+    eur_per_kwh: 0.25
+  - start_step: 34
+    end_step: 42
+    eur_per_kwh: 0.4
+
+# Optional recipe for variable-day studies. Fixed mode uses the reference
+# values above. Each household draws one independent uniform load factor and
+# one independent uniform PV factor per generated day. Only listed fields are
+# scaled; profile timing, EV hardware, tariffs, and trip energy stay fixed.
+day_variation:
+  load:
+    fields: [base_kw, morning_peak_kw, evening_peak_kw]
+    factor_range: [0.80, 1.20]
+  pv:
+    fields: [peak_kw]
+    factor_range: [0.75, 1.25]
+  departures:
+    # A selected step also becomes the household's disconnection start.
+    # Return steps above stay fixed. Times use half-hour steps from midnight.
+    all_distinct: true
+    step_options_by_household:
+      reliable_commuter: [14, 15, 16]
+      price_flexible_worker: [17, 18, 19]
+      solar_battery_conserver: [20]
+      low_power_affordability_home: [12, 13, 14]
+      battery_autonomy_home: [16, 17, 18]

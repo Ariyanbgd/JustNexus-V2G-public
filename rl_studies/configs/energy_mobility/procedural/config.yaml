@@ -1,0 +1,8 @@
+# Paper's energy–mobility procedural formulation. The simulator applies the
+# hard discharge-authorization gate before physical limits in every run.
+# Five authority-availability features extend the base observation to 57.
+# The three base reward terms remain active. These two additional losses are
+# divided by the 48-transition episode horizon before their weights apply.
+weights:
+  unauthorized_discharge_incidence: 1.0  # Pre-gate requests below -0.001 kW per discharge-prohibited opportunity.
+  procedural_consistency: 1.0           # Within-status binary discharge-activity inconsistency.

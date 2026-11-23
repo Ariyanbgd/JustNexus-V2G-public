@@ -1,0 +1,28 @@
+# DISTRIBUTIVE_TYPE in train.py selects one type below. All use the same
+# 54-value observation, the three base reward terms, and one extra payment
+# when the last household departs. Burden = unmet trip energy / required energy;
+# satisfaction = 1 - burden. Weights must be finite and nonnegative.
+types:
+  mean_deviation:
+    # Two independent historical penalties. W = largest excess burden above
+    # the five-household mean; E = mean of positive excess burdens.
+    # Added reward: -worst_burden_weight * W/0.8
+    #               -mean_excess_burden_weight * E/0.24.
+    worst_burden_weight: 1.0
+    mean_excess_burden_weight: 1.0
+
+  max_min:
+    # Added reward: -weight * largest household burden fraction.
+    weight: 1.0
+
+  generalized_gini:
+    # Added reward: weight * (sum_j rank_weights[j] * sorted_satisfaction[j] - 1).
+    # The FIVE rank weights apply from LOWEST to HIGHEST satisfaction, not to
+    # named households. The worst-served household gets the first weight even
+    # if its identity changes across days. The values sum to 1; larger early
+    # weights prioritize worse-served households. This vector was predeclared
+    # for the paper as a normative example, not estimated from data or uniquely
+    # implied by generalized Gini. Example: [0,1,1,1,1] gives -0.40 at weight 1.
+    # The separate weight scales the entire resulting Gini reward term.
+    weight: 1.0
+    rank_weights_low_to_high: [0.40, 0.25, 0.17, 0.11, 0.07]

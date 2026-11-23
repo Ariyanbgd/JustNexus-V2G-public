@@ -1,0 +1,6 @@
+# Two independent nonnegative weights for battery effects across the day.
+# Both rewards use fixed 28.5 kWh normalization from the original experiment;
+# the five-household observation contains battery throughput and reserve context.
+weights:
+  excess_daily_battery_throughput: 1.0  # Incremental excess over each battery's daily controlled-throughput cap; each step.
+  battery_reserve_deficit: 1.0          # Missing battery energy relative to household reserve targets; once at episode end.

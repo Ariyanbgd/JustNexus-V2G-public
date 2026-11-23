@@ -1,0 +1,45 @@
+# Dedicated joint energy–mobility formulation used by the historical combined
+# experiment. It has 56 observations: base 52, two cumulative mobility-burden
+# context values, and two cumulative oracle-gap disparity context values.
+# The three shared base reward weights and PPO/day settings come from
+# ../base/config.yaml. The coefficients below are independent choices.
+
+# Mobility shortfall is charged at each household departure. These two
+# normalized disparity terms are paid once when the last household departs:
+# -worst_burden_weight * (largest above-mean burden)/0.8
+# -mean_excess_burden_weight * (mean positive above-mean burden)/0.24.
+# Burden means unmet trip energy divided by that household's requirement.
+mobility_disparity_weights:
+  worst_burden_weight: 1.0
+  mean_excess_burden_weight: 1.0
+
+# Each step adds -action_gap_weight times the SUM of five household-normalized
+# squared applied-action gaps to day-matched offline oracle schedules.
+# With five households, 0.2 gives their mean gap. This training gap is unclipped.
+action_gap_weight: 0.2
+
+# At episode end, each household's cumulative normalized squared gap is
+# capped at 1 for the disparity calculation only. These two normalized
+# alignment-disparity penalties are then paid once, using divisors 0.8/0.24.
+# The gap cap and divisors are fixed in the library to match the experiment.
+alignment_disparity_weights:
+  worst_gap_weight: 1.0
+  mean_excess_gap_weight: 1.0
+
+# The full ordered household preferences are kept here so this joint study is
+# reproducible without silently inheriting a changing recognitional profile.
+# First minimize trip shortfall; last minimize squared power to break ties.
+# Intermediate objectives can be reordered or omitted if the oracle method
+# supports them. These are researcher-declared, not elicited household choices.
+preferences:
+  reliable_commuter:
+    reserve_kwh: 4.0
+    priority_order: [minimum_trip_shortfall, minimum_reserve_shortfall, minimum_throughput, minimum_bill, minimum_squared_power]
+  price_flexible_worker:
+    priority_order: [minimum_trip_shortfall, minimum_bill, minimum_throughput, minimum_squared_power]
+  solar_battery_conserver:
+    priority_order: [minimum_trip_shortfall, minimum_throughput, minimum_bill, minimum_squared_power]
+  low_power_affordability_home:
+    priority_order: [minimum_trip_shortfall, minimum_incremental_bill, minimum_throughput, minimum_squared_power]
+  battery_autonomy_home:
+    priority_order: [minimum_trip_shortfall, minimum_discharge, minimum_bill, minimum_throughput, minimum_squared_power]

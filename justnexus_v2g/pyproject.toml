@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "justnexus-v2g"
+version = "0.1.0"
+description = "Residential V2G simulator and configurable RL problem library"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "PyYAML",
+  "gymnasium",
+]
+authors = [
+  { name = "Ariyan Bighashdel" }
+]
+
+[project.optional-dependencies]
+rl = ["stable-baselines3>=2.3", "cvxpy>=1.4", "clarabel"]
+test = ["pytest"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
