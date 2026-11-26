@@ -7,6 +7,13 @@ from pathlib import Path
 
 import numpy as np
 
+from justnexus_v2g.gym_env.throughput import (
+    MOBILITY_THROUGHPUT_REFERENCE_ID,
+    controlled_throughput_caps_kwh,
+)
+from justnexus_v2g.gym_env.procedural import (
+    UNAUTHORIZED_DISCHARGE_EPSILON_KW, apply_procedural_rules,
+)
 from justnexus_v2g.rl.recognitional import prepare_oracle_bundle
 
 MOBILITY_REFERENCE_KWH = 74.0
@@ -32,6 +39,10 @@ def episode_metrics(infos: list[dict], params, *, oracle_bundle: dict | None = N
     last = infos[-1]
     if last["t"] != params.episode_steps - 1:
         raise ValueError("Paper metrics require the final episode transition")
+    if len(infos) != params.episode_steps - 1 or any(
+        info["t"] != step for step, info in enumerate(infos, start=1)
+    ):
+        raise ValueError("Paper metrics require a complete ordered episode trace")
     n = params.n_households
     dt = float(params.dt_hours)
     shortfalls = [float(x) for x in last["household_departure_shortfall_kwh"]]
@@ -60,10 +71,16 @@ def episode_metrics(infos: list[dict], params, *, oracle_bundle: dict | None = N
         raise ValueError("Reserve targets differ from the paper's 28.5 kWh reference")
     reserve_deficits = [max(target - energy, 0.0)
                         for target, energy in zip(targets, final_energy, strict=True)]
-    throughput_excess = [float(x) for x in
-                         last["daily_excess_battery_throughput_kwh_by_household"]]
-    if len(throughput_excess) != n:
-        raise ValueError("Missing household throughput excess values")
+    applied = [[float(h["applied_ev_power_kw"]) for h in info["households"]]
+               for info in infos]
+    if any(len(row) != n or any(not math.isfinite(power) for power in row)
+           for row in applied):
+        raise ValueError("Invalid executed household power trace")
+    throughput = [math.fsum(abs(row[i]) * dt for row in applied)
+                  for i in range(n)]
+    caps = controlled_throughput_caps_kwh(params, nexus="energy_mobility")
+    throughput_excess = [max(value - cap, 0.0)
+                         for value, cap in zip(throughput, caps, strict=True)]
 
     result = {
         "operational": {
@@ -82,6 +99,10 @@ def episode_metrics(infos: list[dict], params, *, oracle_bundle: dict | None = N
             "worst_household_burden": max(burdens),
         },
         "intertemporal": {
+            "controlled_throughput_reference": MOBILITY_THROUGHPUT_REFERENCE_ID,
+            "controlled_throughput_cap_kwh_by_household": caps,
+            "controlled_throughput_kwh_by_household": throughput,
+            "controlled_throughput_kwh": math.fsum(throughput),
             "terminal_reserve_deficit_kwh_by_household": reserve_deficits,
             "terminal_reserve_deficit_kwh": math.fsum(reserve_deficits),
             "normalized_terminal_reserve_deficit": (
@@ -117,19 +138,47 @@ def episode_metrics(infos: list[dict], params, *, oracle_bundle: dict | None = N
             "reference_oracle_sha256": oracle_bundle["sha256"],
         }
 
-    if all("unauthorized_discharge_opportunities" in info["reward_terms"] for info in infos):
-        incidents = math.fsum(float(info["reward_terms"]["unauthorized_discharge_incidents"])
-                              for info in infos)
-        opportunities = math.fsum(float(info["reward_terms"]["unauthorized_discharge_opportunities"])
-                                  for info in infos)
-        consistency = math.fsum(float(info["reward_terms"]["procedural_consistency_score"])
-                                for info in infos) / len(infos)
-        result["procedural"] = {
-            "prohibited_request_count": int(round(incidents)),
-            "prohibited_opportunity_count": int(round(opportunities)),
-            "prohibited_request_rate": incidents / opportunities if opportunities else None,
-            "mean_stepwise_discharge_consistency_score": consistency,
-        }
+    raw_count = executed_count = opportunity_count = 0
+    shadow_consistency = []
+    for info in infos:
+        t = int(info["t"]) - 1  # reports describe the action selected before transition t
+        enforced = "procedural" in info.get("applied_justice_modifiers", [])
+        if enforced != ("procedural" in info):
+            raise ValueError("Procedural enforcement trace presence disagrees with formulation")
+        if enforced:
+            trace = info["procedural"].get("trace")
+            if not isinstance(trace, dict) or "raw_aggregator_request_kw" not in trace:
+                raise ValueError("Procedural enforcement requires the pre-gate raw trace")
+            raw = trace["raw_aggregator_request_kw"]
+        else:
+            raw = info["constraints"]["requested_ev_power_kw"]
+        if len(raw) != n or any(not math.isfinite(float(power)) for power in raw):
+            raise ValueError("Invalid pre-gate request vector")
+        raw = [float(power) for power in raw]
+        actual = [float(h["applied_ev_power_kw"]) for h in info["households"]]
+        _, report = apply_procedural_rules(
+            raw, params, decision_step=t,
+        )
+        prohibited = [bound.min_kw >= 0.0 for bound in report.authority_bounds_kw]
+        opportunity_count += sum(prohibited)
+        raw_count += sum(flag and power < -UNAUTHORIZED_DISCHARGE_EPSILON_KW
+                         for flag, power in zip(prohibited, raw, strict=True))
+        executed_count += sum(flag and power < -UNAUTHORIZED_DISCHARGE_EPSILON_KW
+                              for flag, power in zip(prohibited, actual, strict=True))
+        shadow_consistency.append(1.0 - report.procedural_consistency_loss)
+    result["procedural"] = {
+        "authority_reference": "scenario_declared_household_procedural_rules_v1",
+        "opportunity_definition": "authority_bounds_min_kw_nonnegative_at_pre_action_time",
+        "discharge_threshold_kw": -UNAUTHORIZED_DISCHARGE_EPSILON_KW,
+        "prohibited_request_count": raw_count,
+        "prohibited_execution_count": executed_count,
+        "prohibited_opportunity_count": opportunity_count,
+        "prohibited_request_rate": raw_count / opportunity_count if opportunity_count else None,
+        "prohibited_execution_rate": executed_count / opportunity_count if opportunity_count else None,
+        "shadow_authority_resolved_consistency_score": math.fsum(shadow_consistency) / len(infos),
+        "mean_stepwise_discharge_consistency_score": math.fsum(shadow_consistency) / len(infos),
+        "authority_application": "enforced" if all("procedural" in info for info in infos) else "shadow",
+    }
 
     for group in result.values():
         for value in group.values():

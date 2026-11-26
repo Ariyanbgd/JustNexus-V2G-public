@@ -111,6 +111,8 @@ def apply_procedural_rules(
     raw_ev_power_kw: list[float],
     params: SimulationParams,
     state: SimulatorState | None = None,
+    *,
+    decision_step: int | None = None,
 ) -> tuple[list[float], ProceduralReport]:
     """Resolve aggregator requests against household authority boundaries."""
 
@@ -144,7 +146,7 @@ def apply_procedural_rules(
         authority_available = is_authority_available(
             rules.authority_mode,
             household_params,
-            state.t if state is not None else None,
+            decision_step if decision_step is not None else (state.t if state is not None else None),
             params.cycle_steps or params.episode_steps,
         )
         authority_mode = "available" if authority_available else "unavailable"

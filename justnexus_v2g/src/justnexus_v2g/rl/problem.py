@@ -11,13 +11,7 @@ import numpy as np
 
 from justnexus_v2g.core.params import SimulationParams
 from justnexus_v2g.gym_env import GymEnvConfig, JustNexusV2GEnv
-from justnexus_v2g.gym_env.formulations import (
-    ENERGY_MOBILITY_DISTRIBUTIVE_SYSTEM_OBSERVATION_FIELDS,
-    ENERGY_MOBILITY_HOUSEHOLD_OBSERVATION_FIELDS,
-    ENERGY_MOBILITY_SYSTEM_OBSERVATION_FIELDS,
-    ENERGY_INTERTEMPORAL_HOUSEHOLD_OBSERVATION_FIELDS,
-    ENERGY_PROCEDURAL_HOUSEHOLD_OBSERVATION_FIELDS,
-)
+from justnexus_v2g.gym_env.observations import observation_metadata
 from justnexus_v2g.gym_env.rewards import RewardNormalization, RewardWeights
 from justnexus_v2g.gym_env.procedural import UNAUTHORIZED_DISCHARGE_EPSILON_KW
 from justnexus_v2g.rl.day_suite import generate_day_splits
@@ -420,24 +414,6 @@ def make_rl_problem(*, mode: str, nexus: str, configuration: dict,
             "metric_reference_config_sha256": sources["metric_reference_config_sha256"],
             "metric_reference_profile": configuration["metric_reference"]["profile"],
         } if "metric_reference" in configuration else {}),
-        "observation": {
-            "system_fields": list(ENERGY_MOBILITY_SYSTEM_OBSERVATION_FIELDS) + (
-                list(ENERGY_MOBILITY_DISTRIBUTIVE_SYSTEM_OBSERVATION_FIELDS)
-                if distributive is not None or combined is not None else []
-            ) + (
-                ["normalized_cumulative_worst_recognitional_gap",
-                 "normalized_cumulative_excess_recognitional_gap"]
-                if combined is not None else []
-            ),
-            "household_fields": list(ENERGY_MOBILITY_HOUSEHOLD_OBSERVATION_FIELDS) + (
-                list(ENERGY_INTERTEMPORAL_HOUSEHOLD_OBSERVATION_FIELDS)
-                if intertemporal is not None else []
-            ) + (
-                list(ENERGY_PROCEDURAL_HOUSEHOLD_OBSERVATION_FIELDS)
-                if procedural is not None else []
-            ),
-            "size": expected_observation_size,
-        },
         "reward": {
             "profile": reward_profile,
             "weights": {**selected_weights, **(procedural["weights"] if procedural is not None else {}), **({
@@ -555,8 +531,20 @@ def make_rl_problem(*, mode: str, nexus: str, configuration: dict,
                 record["day_id"]: bundle["sha256"]
                 for (_, record), bundle in zip(selected, bundles, strict=True)
             }
+    emitted_env = env.core if mode == "variable" else env
+    appended_fields = (
+        emitted_env.appended_observation_fields
+        if isinstance(emitted_env, OfflineRecognitionalRewardWrapper) else ()
+    )
+    provenance["observation"] = observation_metadata(
+        source_params,
+        emitted_env.unwrapped.formulation,
+        configuration.get("scenario_labels"),
+        appended_fields=appended_fields,
+    )
     expected_shape = (expected_observation_size,)
-    if env.observation_space.shape != expected_shape:
+    if (env.observation_space.shape != expected_shape
+            or provenance["observation"]["size"] != expected_observation_size):
         env.close()
         raise RuntimeError(f"Unexpected energy–mobility observation shape: {env.observation_space.shape}")
     evaluation = dict(mode_config["evaluation"])

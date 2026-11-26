@@ -22,6 +22,8 @@ from rl_studies.config import (
     DEFAULT_CONFIG_DIR, DEFAULT_SCENARIO, JUSTICE_CHOICES, MODE_CHOICES,
     NEXUS_CHOICES, available_study_options, load_study_inputs,
 )
+from rl_studies.provenance import (dependency_versions, make_provenance,
+                                   source_identity)
 
 # Select the study here, or pass the equivalent command-line options.
 # MODE: fixed | variable
@@ -40,7 +42,8 @@ PREFERENCE_PROFILE = "declared_needs_v1"
 ORACLE_CACHE = REPOSITORY / "rl_studies" / "oracle_cache"
 
 
-def _train_epistemic_sweep(args, inputs) -> None:
+def _train_epistemic_sweep(args, inputs, source_at_start: dict,
+                           dependencies_at_start: dict) -> None:
     """Train scalar priority policies and select a Pareto portfolio on validation."""
     from stable_baselines3 import PPO
     from stable_baselines3.common.monitor import Monitor
@@ -177,8 +180,20 @@ def _train_epistemic_sweep(args, inputs) -> None:
         "candidates": candidates, "validation_front": front,
     }, indent=2, sort_keys=True) + "\n").encode()
     (output / "validation_portfolio.json").write_bytes(portfolio_bytes)
+    artifacts = ["resolved_config.json", "scenario.yaml", "validation_portfolio.json"]
+    for subrun in subruns:
+        directory = subrun["directory"]
+        artifacts.extend(f"{directory}/{name}" for name in
+                         ("selected_model.zip", "final_model.zip", "validation.json"))
+    artifacts.extend(candidate["checkpoint"] for candidate in candidates)
+    experimental_provenance = make_provenance(
+        REPOSITORY, output, artifacts, first_provenance,
+        source_at_start, dependencies_at_start,
+    )
+    stable = experimental_provenance["source_stability"] == "stable"
     (output / "run.json").write_text(json.dumps({
-        "status": "complete", "study_kind": "epistemic_priority_sweep",
+        "status": "complete" if stable else "provenance_uncertain",
+        "study_kind": "epistemic_priority_sweep",
         "problem": first_provenance, "smoke": bool(args.smoke),
         "subruns": subruns,
         "input_snapshots": {
@@ -194,7 +209,10 @@ def _train_epistemic_sweep(args, inputs) -> None:
             "selected_count": len(front),
             "test_rule": "evaluate_all_candidates; report_descriptive_test_front",
         },
+        "experimental_provenance": experimental_provenance,
     }, indent=2, sort_keys=True) + "\n")
+    if not stable:
+        raise RuntimeError("Source or dependencies changed during training; run is provenance_uncertain")
     print(output)
 
 
@@ -237,6 +255,8 @@ def main() -> None:
         if justice == "recognitional" else None
     )
 
+    source_at_start = source_identity(REPOSITORY) if not args.inspect else None
+    dependencies_at_start = dependency_versions() if not args.inspect else None
     inputs = load_study_inputs(
         mode=args.mode, nexus=args.nexus, justice=justice,
         distributive_type=distributive_type,
@@ -244,7 +264,7 @@ def main() -> None:
         config_dir=args.config_dir, scenario_path=args.scenario,
     )
     if justice == "epistemic":
-        _train_epistemic_sweep(args, inputs)
+        _train_epistemic_sweep(args, inputs, source_at_start, dependencies_at_start)
         return
     problem = make_rl_problem(
         mode=args.mode, nexus=args.nexus, justice=justice,
@@ -324,8 +344,16 @@ def main() -> None:
         model.save(output / "final_model.zip")
         shutil.copy2(output / "best_validation_model.zip", output / "selected_model.zip")
 
+        experimental_provenance = make_provenance(
+            REPOSITORY, output,
+            ["resolved_config.json", "scenario.yaml", "selected_model.zip",
+             "best_validation_model.zip", "final_model.zip", "validation.json"],
+            problem.provenance, source_at_start, dependencies_at_start,
+            validation_problem.provenance.get("oracle_bundles"),
+        )
+        stable = experimental_provenance["source_stability"] == "stable"
         record = {
-            "status": "complete",
+            "status": "complete" if stable else "provenance_uncertain",
             "problem": problem.provenance,
             "training": training,
             "evaluation_config": evaluation,
@@ -349,8 +377,11 @@ def main() -> None:
                 "validation_manifest": "validation.json",
                 "fixed_day_is_in_sample": args.mode == "fixed",
             },
+            "experimental_provenance": experimental_provenance,
         }
         (output / "run.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        if not stable:
+            raise RuntimeError("Source or dependencies changed during training; run is provenance_uncertain")
         monitored_env.close()
         print(output)
     finally:

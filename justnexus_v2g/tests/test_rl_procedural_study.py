@@ -71,10 +71,7 @@ def test_procedural_test_metrics_include_incidence_and_consistency():
     assert procedural["prohibited_opportunity_count"] > 0
     assert procedural["prohibited_request_rate"] == 0.0
     assert 0.0 <= procedural["mean_stepwise_discharge_consistency_score"] <= 1.0
-    assert set(procedural) == {
-        "prohibited_request_count", "prohibited_opportunity_count",
-        "prohibited_request_rate", "mean_stepwise_discharge_consistency_score",
-    }
+    assert procedural["prohibited_execution_rate"] == 0.0
 
 
 def test_procedural_weights_must_be_finite_and_nonnegative():

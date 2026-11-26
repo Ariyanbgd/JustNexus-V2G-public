@@ -11,6 +11,12 @@ from justnexus_v2g.core.params import SimulationParams
 from justnexus_v2g.gym_env.env import JustNexusV2GEnv
 
 
+GAP_DISTRIBUTION_OBSERVATION_FIELDS = (
+    "normalized_cumulative_worst_recognitional_gap",
+    "normalized_cumulative_excess_recognitional_gap",
+)
+
+
 class OfflineRecognitionalRewardWrapper(
     Wrapper[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 ):
@@ -101,11 +107,11 @@ class OfflineRecognitionalRewardWrapper(
                 self.observation_space = spaces.Box(
                     low=np.concatenate((
                         env.observation_space.low,
-                        np.zeros(2, dtype=np.float32),
+                        np.zeros(len(GAP_DISTRIBUTION_OBSERVATION_FIELDS), dtype=np.float32),
                     )).astype(np.float32),
                     high=np.concatenate((
                         env.observation_space.high,
-                        np.full(2, np.inf, dtype=np.float32),
+                        np.full(len(GAP_DISTRIBUTION_OBSERVATION_FIELDS), np.inf, dtype=np.float32),
                     )).astype(np.float32),
                     dtype=np.float32,
                 )
@@ -118,6 +124,13 @@ class OfflineRecognitionalRewardWrapper(
         self._step_index = 0
         self._cumulative_gap_kwh = np.zeros(env.params.n_households, dtype=float)
         self._cumulative_squared_gap_kw2h = np.zeros(env.params.n_households, dtype=float)
+
+    @property
+    def appended_observation_fields(self) -> tuple[str, ...]:
+        return (
+            GAP_DISTRIBUTION_OBSERVATION_FIELDS
+            if self.include_gap_distribution_observation else ()
+        )
 
     @property
     def params(self) -> SimulationParams:
@@ -166,8 +179,15 @@ class OfflineRecognitionalRewardWrapper(
         if not self.include_gap_distribution_observation:
             return obs
         _, _, normalized_worst, normalized_excess = self._gap_distribution()
+        values = {
+            "normalized_cumulative_worst_recognitional_gap": normalized_worst,
+            "normalized_cumulative_excess_recognitional_gap": normalized_excess,
+        }
         return np.concatenate((
-            obs, np.asarray([normalized_worst, normalized_excess], dtype=np.float32)
+            obs, np.asarray(
+                [values[field] for field in self.appended_observation_fields],
+                dtype=np.float32,
+            ),
         ))
 
     def step(self, action: np.ndarray):

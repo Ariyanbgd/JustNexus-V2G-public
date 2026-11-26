@@ -20,6 +20,8 @@ from justnexus_v2g.rl.metrics import (
     RESERVE_REFERENCE_KWH, prepare_metric_oracles,
 )
 from justnexus_v2g.core.config import load_simulation_params
+from justnexus_v2g.gym_env.throughput import MOBILITY_THROUGHPUT_REFERENCE_ID
+from rl_studies.provenance import verify_provenance
 
 
 def _metric_references(configuration: dict) -> dict:
@@ -28,12 +30,13 @@ def _metric_references(configuration: dict) -> dict:
         "import_overload_squared_kw2h": GRID_REFERENCE_KW2H,
         "command_mismatch_kwh": MISMATCH_REFERENCE_KWH,
         "terminal_reserve_and_throughput_kwh": RESERVE_REFERENCE_KWH,
+        "controlled_throughput_reference": MOBILITY_THROUGHPUT_REFERENCE_ID,
         "oracle_preference_profile": configuration.get("metric_reference", {}).get("profile"),
     }
 
 
 def _test_epistemic_portfolio(output: Path, record: dict, configuration: dict,
-                              scenario_path: Path) -> None:
+                              scenario_path: Path, provenance_check: dict) -> None:
     """Test every saved candidate; preserve validation selection separately."""
     from stable_baselines3 import PPO
 
@@ -124,6 +127,7 @@ def _test_epistemic_portfolio(output: Path, record: dict, configuration: dict,
         "fixed_day_is_in_sample": source["mode"] == "fixed",
         "smoke": bool(record["smoke"]),
         "test_results": results,
+        "experimental_provenance": provenance_check,
     }
     with (output / "test.json").open("x") as stream:
         json.dump(result, stream, indent=2, sort_keys=True)
@@ -157,6 +161,7 @@ def main() -> None:
         raise ValueError("Resolved study config snapshot changed since training")
     if hashlib.sha256(scenario_bytes).hexdigest() != snapshots["scenario_sha256"]:
         raise ValueError("Scenario snapshot changed since training")
+    provenance_check = verify_provenance(record, REPOSITORY, output)
     if args.inspect:
         configuration = json.loads(config_bytes)
         selection = record["model_selection"]
@@ -174,12 +179,14 @@ def main() -> None:
             "test_candidate_count": selection.get("candidate_count", 1),
             "validation_selected_count": selection.get("selected_count", 1),
             "test_report_exists": (output / "test.json").exists(),
+            "experimental_provenance": provenance_check,
         }, indent=2, sort_keys=True))
         return
     if (output / "test.json").exists():
         raise FileExistsError("test.json already exists; the reserved test is evaluated once per run")
     if record.get("study_kind") == "epistemic_priority_sweep":
-        _test_epistemic_portfolio(output, record, json.loads(config_bytes), scenario_path)
+        _test_epistemic_portfolio(output, record, json.loads(config_bytes), scenario_path,
+                                  provenance_check)
         return
     configuration = json.loads(config_bytes)
     problem = make_rl_problem(
@@ -229,6 +236,7 @@ def main() -> None:
         "independent_day_split": mode == "variable",
         "smoke": bool(record["smoke"]),
         "metric_references": _metric_references(configuration),
+        "experimental_provenance": provenance_check,
     })
     if "oracle_bundles" in source:
         result["oracle_bundles"] = problem.provenance["oracle_bundles"]

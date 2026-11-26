@@ -21,6 +21,41 @@ def observation_size(
     )
 
 
+def observation_metadata(
+    params: SimulationParams,
+    formulation: FormulationSpec,
+    household_labels: list[str] | None,
+    *,
+    appended_fields: tuple[str, ...] = (),
+) -> dict:
+    """Describe the flat vector in the same order as its core and wrapper emitters."""
+    if household_labels is not None and len(household_labels) != params.n_households:
+        raise ValueError("Observation metadata needs one label per household")
+    flat_fields = []
+    for field in formulation.system_observation_fields:
+        flat_fields.append({"index": len(flat_fields), "scope": "system", "field": field})
+    for household_index in range(params.n_households):
+        label = household_labels[household_index] if household_labels is not None else None
+        for field in formulation.household_observation_fields:
+            flat_fields.append({
+                "index": len(flat_fields),
+                "scope": "household",
+                "field": field,
+                "household_index": household_index,
+                "household_label": label,
+            })
+    for field in appended_fields:
+        flat_fields.append({"index": len(flat_fields), "scope": "appended", "field": field})
+    return {
+        "schema_version": 2,
+        "system_fields": list(formulation.system_observation_fields),
+        "household_fields": list(formulation.household_observation_fields),
+        "appended_fields": list(appended_fields),
+        "flat_fields": flat_fields,
+        "size": len(flat_fields),
+    }
+
+
 def make_observation_space(
     params: SimulationParams,
     config: GymEnvConfig | None = None,

@@ -22,6 +22,7 @@ from justnexus_v2g.gym_env.rewards import (
     calculate_reward,
 )
 from justnexus_v2g.gym_env.specs import GymEnvConfig
+from justnexus_v2g.gym_env.throughput import controlled_throughput_caps_kwh
 
 
 class JustNexusV2GEnv(Env[np.ndarray, np.ndarray]):
@@ -222,35 +223,18 @@ class JustNexusV2GEnv(Env[np.ndarray, np.ndarray]):
         )
 
     def _daily_battery_throughput_limits_kwh(self) -> list[float]:
-        limits = []
         mobility_intertemporal = (
             self.config.nexus == "energy_mobility"
             and "intertemporal" in self.formulation.applied_justice_modifiers
         )
+        if mobility_intertemporal:
+            return controlled_throughput_caps_kwh(self.params, nexus=self.config.nexus)
+        limits = []
         for household in self.params.households:
             allowance = household.ev.daily_battery_throughput_limit_kwh
             if allowance is None:
                 allowance = household.ev.battery_capacity_kwh
-            if mobility_intertemporal:
-                reserve_fraction = household.ev.daily_battery_reserve_fraction
-                if reserve_fraction is None:
-                    reserve_fraction = 0.1
-                reserve_target = (
-                    float(reserve_fraction) * household.ev.battery_capacity_kwh
-                )
-                required = float(
-                    household.mobility.required_departure_energy_kwh or 0.0
-                )
-                efficiency = float(household.ev.charge_efficiency)
-                essential_charging = (
-                    (required + reserve_target) / efficiency
-                    if efficiency > 1e-12
-                    else 0.0
-                )
-                limit = essential_charging + float(allowance)
-            else:
-                limit = float(allowance)
-            limits.append(float(max(limit, 0.0)))
+            limits.append(float(max(float(allowance), 0.0)))
         return limits
 
     def _distributive_observation_context(self) -> dict[str, float]:

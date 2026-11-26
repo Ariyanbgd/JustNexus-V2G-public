@@ -34,7 +34,7 @@ def test_fixed_idle_policy_reports_paper_normalized_losses():
     assert metrics["intertemporal"]["normalized_terminal_reserve_deficit"] == 1.0
     assert metrics["intertemporal"]["normalized_excess_controlled_throughput"] == 0.0
     assert result["mean_metrics"] == {
-        group: {key: value for key, value in fields.items() if isinstance(value, (int, float, list))}
+        group: {key: value for key, value in fields.items() if isinstance(value, (int, float, list)) and not isinstance(value, bool)}
         for group, fields in metrics.items()
     }
 
@@ -84,7 +84,7 @@ def test_intertemporal_policy_can_be_audited_on_distributive_and_recognitional_m
     finally:
         problem.env.close()
     assert set(result["mean_metrics"]) == {
-        "operational", "distributive", "recognitional", "intertemporal",
+        "operational", "distributive", "recognitional", "intertemporal", "procedural",
     }
     assert result["mean_metrics"]["distributive"]["worst_household_burden"] == 1.0
     assert result["mean_metrics"]["recognitional"]["mean_clipped_oracle_alignment"] == 0.0
@@ -109,7 +109,7 @@ def test_variable_days_report_each_day_then_arithmetic_mean():
                 for i, mean in enumerate(value):
                     assert mean == pytest.approx(sum(row["metrics"][group][key][i]
                                                      for row in result["episodes"]) / 2)
-            else:
+            elif isinstance(value, (int, float)):
                 assert value == pytest.approx(sum(row["metrics"][group][key]
                                                   for row in result["episodes"]) / 2)
 
@@ -125,16 +125,39 @@ def test_procedural_rate_uses_pregate_incidents_over_opportunities():
         infos = []
         for step in range(48):
             _, _, _, _, info = problem.env.step(np.zeros(5, dtype=np.float32))
-            info["reward_terms"]["unauthorized_discharge_incidents"] = 1 if step == 0 else 0
-            info["reward_terms"]["unauthorized_discharge_opportunities"] = 2 if step == 0 else 0
-            info["reward_terms"]["procedural_consistency_score"] = 0.75
+            if step == 0:
+                info["constraints"]["requested_ev_power_kw"][4] = -2.0
+                info["households"][4]["applied_ev_power_kw"] = -1.0
             infos.append(info)
         metrics = episode_metrics(infos, problem.env.unwrapped.params)
     finally:
         problem.env.close()
-    assert metrics["procedural"] == {
-        "prohibited_request_count": 1,
-        "prohibited_opportunity_count": 2,
-        "prohibited_request_rate": 0.5,
-        "mean_stepwise_discharge_consistency_score": 0.75,
-    }
+    assert metrics["procedural"]["prohibited_request_count"] == 1
+    assert metrics["procedural"]["prohibited_execution_count"] == 1
+    assert metrics["procedural"]["prohibited_opportunity_count"] > 0
+    assert metrics["procedural"]["prohibited_request_rate"] == pytest.approx(
+        1 / metrics["procedural"]["prohibited_opportunity_count"]
+    )
+
+
+def test_zero_opportunities_have_undefined_rates():
+    inputs = load_study_inputs(mode="fixed", nexus="energy_mobility")
+    problem = make_rl_problem(
+        mode="fixed", nexus="energy_mobility", split="test",
+        configuration=inputs.configuration, source_params=inputs.source_params,
+    )
+    try:
+        problem.env.reset(seed=7)
+        infos = [problem.env.step(np.zeros(5, dtype=np.float32))[-1]
+                 for _ in range(48)]
+        params = deepcopy(problem.env.unwrapped.params)
+        for household in params.households:
+            household.procedural.authority_mode = "full"
+        metric = episode_metrics(infos, params)["procedural"]
+    finally:
+        problem.env.close()
+    assert metric["prohibited_opportunity_count"] == 0
+    assert metric["prohibited_request_count"] == 0
+    assert metric["prohibited_execution_count"] == 0
+    assert metric["prohibited_request_rate"] is None
+    assert metric["prohibited_execution_rate"] is None
